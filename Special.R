@@ -31,7 +31,7 @@ wintrim <- function(x,  trimtype = "TRIM" , trimlevel = 0.05)
   if(trimtype =="TRIM"){
     #  x.trim <- subset(x, x >= x.bounds[1] & x<= x.bounds[2] ) <-- Old version
     # Replacing low values by NAs
-    x.trim <- replace(x, x <= x.bounds[1]| x >= x.bounds[2] , NA)    
+    x.trim <- replace(x, x <= x.bounds[1] |  x >= x.bounds[2] , NA)    
     
   }
   if(trimtype =="WINSOR"){
@@ -41,10 +41,35 @@ wintrim <- function(x,  trimtype = "TRIM" , trimlevel = 0.05)
     x.trim <- replace(x.trim, x.trim >= x.bounds[2], x.bounds[2])
   }
   # return(list(x.trim, x.bounds))
-  print("number of points")
+  #print("number of points trimed out")
   return(x.trim)
 }
 
+
+wintrim2 <- function(x,  trimtype = "TRIM" , trimlevel = 0.05)
+  # function applying trimming to vector x
+  # Note that the level of triming /winsoring is already in percent
+  # Version that REMOVE points (instead of imputing NA)
+{ 
+  trim.U <- 1 - trimlevel/2
+  trim.L <- trimlevel/2
+  x.bounds <- quantile(x, probs = c(trim.L, trim.U), na.rm = TRUE)
+  ##### ---- option na.rm  To be CONFIRMED -----------------------
+  
+  if(trimtype =="TRIM"){
+     x.trim <- subset(x, x >= x.bounds[1] & x<= x.bounds[2] ) 
+    
+  }
+  if(trimtype =="WINSOR"){
+    # Replacing low values by low bound
+    x.trim <- replace(x, x <= x.bounds[1], x.bounds[1])    
+    #Replacing high values by high bounds
+    x.trim <- replace(x.trim, x.trim >= x.bounds[2], x.bounds[2])
+  }
+  # return(list(x.trim, x.bounds))
+  #print("number of points trimed out")
+  return(x.trim)
+}
 
 
 # Clean version
@@ -102,8 +127,6 @@ summary(spe.ivreg)
 
 ## END
 }
-
-
 
 
 specialreg2 <- function(D,v,endo, z, exo,
@@ -188,12 +211,17 @@ specialreg2 <- function(D,v,endo, z, exo,
 }
 
 
+#-------------------------------
+
 specialreg.fit <- function(y,v, x, z,
                         trimtype = "TRIM",
                         trimlevel = 0.05, 
                         hetero = "", 
-                        hetv = x, 
-                        data = data.work
+                        hetv = "", 
+                        udensmethod = "CV",
+                        ubw= "" , 
+                        data = data.work,
+                        ...
 )
   # Main function for special regressor 
 {
@@ -221,46 +249,83 @@ specialreg.fit <- function(y,v, x, z,
     uhat <- uhat /sqrt(abs(xbetahat))
   }
   print(summary(uhat))
+  print(paste("---length of uhat",length(uhat), "obs"))
+  
   ## Step 2: Nonparametric estimation  of the density of f
   
   ##--->  Branch 1: Choice of estimation method NP or Ordered choice
   
   # --> if NP estimator
   ## ---> Branch 2: Either  bw is chosed by the user, or CV or Silverman (default) 
-  # TO UNCOMMENT  (Computing Time ) 
-  #bw.cv <-npudensbw(~uhat, ckertype="epanechnikov")
-  #summary(bw.cv)
   
-  # normal-reference rule-of-thumb (Siverman) 
-  bw.sil <-npudensbw(~uhat,bwmethod="normal-reference")
-  summary(bw.sil)
+  # normal-reference rule-of-thumb (Siverman) (always computed to define the object)
+  bw.used <-npudensbw(~uhat,bwmethod="normal-reference")
   
-  # fhat with selected bandwidth
-  fhat <- fitted(npudens(bw.sil))
+  if(udensmethod == "FIXED") {
+  # fhat with user-defined bandwidth
+  bw.used$bw <- ubw
+  }
+  
+  if(udensmethod == "CV"){
+  bw.cv <-npudensbw(~uhat, ckertype="epanechnikov")
+  bw.used$bw <- bw.cv$bw 
+  }
+    
+  #plot(bw.used)
+  # fhat using the bandwidth chosed by method udensmethod, and value bw 
+  summary(bw.used)
+  fhat <- fitted(npudens(bw.used))
+  
+  print(paste("---length of fhat",length(fhat), "obs"))
+  print(paste("--- Nb of fhat =0",length(which(abs(fhat) < 0.0000001)),"obs"))
+  
   
   ## Step 3: Definition of T
-  print("Step3") 
-  
+  print("Step3 -- Computation of T ") 
+  print("-- ")
   vpos <- as.numeric(v >= 0)
   T <- ( as.numeric(y) - vpos)/ fhat
-  print(summary(T))
   
+  print("-- Summary of T--")
+  print(paste("---length of T",length(T), "obs"))
+  print(summary(T))
+  print(" ")
+      
   # Correction if Hetero option
   if(hetero=="HETERO"){
     T <- T * sqrt(abs(xbetahat))   # From step 1bis
   }
+  
   # Apply trimming / Winsorization
   T.trim <- wintrim(T, trimtype= trimtype, trimlevel = trimlevel)
+# T.trim <- T
+  
+  
+  print("-- Summary of T.trim --")
+  print(paste("---length of T.trim",length(T.trim), "obs"))
   print(summary(T.trim))
-  print(dim(T.trim))
+  print(" ")
+  
+  trimmed.out <- length(T)- length(which(T.trim != "NA"))
+  print(paste("Nb of points trimed out: ",trimmed.out, "."))
+  
   
   ## Step 4: 2SLS
-  print("Step4")
+  print("Step4 - 2SLS")
+  print("=============")
   # IV regression with package AER 
   # spe.ivreg <- ivreg(T~x , ~z+x, data= data.work)
   #spe.ivreg <- ivreg(T.trim~x , ~z, data= subset(data.work, T.trim !=NA ))
-  spe.ivreg <- ivreg(T.trim~x | z, data= subset(data.work, T.trim !=NA ))
-  summary(spe.ivreg)
+  
+  spe.ivreg <- ivreg(T.trim~x | z, subset = T.trim != "NA")
+  print(summary(spe.ivreg))
+  
+# print(paste("Formula in ivreg : ",spe.ivreg$call, "."))
+# 
+ print(paste("Number of points : ",spe.ivreg$nobs,"obs."))
+# print(paste("Sample used in ivreg : ",length(spe.ivreg$residuals), "points."))
+
+  
   return(spe.ivreg)
   # TODO implement manualy 2SLS to compare the results. 
   
@@ -382,13 +447,20 @@ data.work$i_can <- (data.work$country == "CANADA")
 data.work$i_fra <- (data.work$country == "FRANCE")
 data.work$i_aus <- (data.work$country == "AUSTRALIA")
 
+
+
+## Load the dat directly after an estimation in STATA to have same sample 2771 obs. 
+data.all<-read.dta("../Water/data/FinalFile.dta")
+nrow(data.all)
+data.work <- data.all
+
 attach(data.work)
 # Here we prepare data with standard notations 
 D <- i_tap
 special <- prix_2008
 Myendo <- isatis_health
 iv <- cbind(itap_2008 ,iconcernwatpol_2008)
-exo <- cbind(i_under18 , log_income ,i_town, i_car, b08_locenv_water, a2_age, i_can, i_fra)
+exo <- cbind(a2_age, i_under18 , log_income ,i_town, i_car, b08_locenv_water,  i_can, i_fra)
 
 #Test of  main special regression function 
 
@@ -402,7 +474,12 @@ specialreg2(D,special, Myendo, iv, exo, trimtype="TRIM" )
 
 NewX <- cbind(isatis_health, i_under18 , log_income ,i_town, i_car, b08_locenv_water, a2_age, i_can, i_fra)
 Newiv <- cbind(iv, exo)
-specialreg.fit(D,special, NewX, Newiv,  trimtype="TRIM" )
+
+retour <- specialreg.fit(D,special, NewX, Newiv,  trimtype="WINSOR", trimlevel=0.025 )
+retour <- specialreg.fit(D,special, NewX, Newiv,  trimtype="WINSOR", trimlevel=0.025,
+                         udensmethod = "FIXED", ubw= 0.23 )
+
+retour <- specialreg.fit(D,special, NewX, Newiv)
 
 
 
@@ -419,7 +496,7 @@ specialreg3(i_tap~prix_2008 + i_under18  |itap_2008, data = data.work )
 x <- rnorm(1000)
 summary(x)
 # a 5%: trim = 0.05
-Montrim <- wintrim(x)   # <- defaut
+Montrim3 <- wintrim2(x)   # <- defaut
 quantile(x, probs=c(0.025, 0.975))
 summary(Montrim)
 
