@@ -43,6 +43,7 @@ wintrim.stata <- function(x,  trimtype = "TRIM" , trimlevel = 0.05)
 # Specialred.fitN : Uses wintrim.stata 
 # requires package np
 
+
 specialreg.fitN <- function(y,v, endo, exo,  iv,
                             trimtype = "TRIM",
                             trimlevel = 0.05, 
@@ -100,11 +101,20 @@ specialreg.fitN <- function(y,v, endo, exo,  iv,
   if(udensmethod == "FIXED") {
     # fhat with user-defined bandwidth
     bw.dens <- npudensbw(uhat, bws=ubw , ckertype="epanechnikov", bandwidth.compute=FALSE) 
-    #     bw.fixed <- bw.sil  # to start with an existing object
-    #     bw.fixed$bw <- ubw
-    #     bw.fixed$bandwidth <- ubw
-    #     dens.np <- npudens(bws=bw.fixed,ckertype="epanechnikov", bandwidth.compute = FALSE)
   }
+  if(udensmethod == "SILVERMAN") {
+    # As in Stata : see http://fmwww.bc.edu/repec/bocode/k/kdens.pdf
+    delta.k <- (3/(5*sqrt(5)))^(0.2)
+    n.5 <- (length(uhat))^(-0.2)
+    sigma.x <-min(sd(uhat, na.rm= FALSE), IQR(uhat, na.rm = FALSE, type = 7)/1.349)
+    bw.sil <- 1.159* delta.k * sigma.x * n.5
+    bw.dens <- npudensbw(uhat, bws=bw.sil , ckertype="epanechnikov", bandwidth.compute=FALSE) 
+  }
+  # bandwidth information   
+  print(" --- bandwith used ---")
+  print(" ---------------")
+  print(summary(bw.dens))
+  
   # Density estimation 
   dens.np <- npudens(bws=bw.dens,ckertype="epanechnikov", bandwidth.compute = FALSE)
   
