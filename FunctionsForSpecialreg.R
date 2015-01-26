@@ -4,10 +4,6 @@
 
 
 
-rm(list=ls())
-#setwd("D:/progs/Celine/Special")   
-setwd("c:/Chris/progs/Celine/Special")   
-
 ## libraries
 
 library(np)
@@ -15,6 +11,8 @@ library(foreign)
 library(AER)
 library(Formula)
 #library(sem)
+library(ks)  # for kernel estimation ...
+
 
 
 ## Fonctions de trimming  
@@ -518,55 +516,50 @@ specialreg.fitN <- function(y,v, endo, exo,  iv,
   uhat <- v - est1$fitted.value   #Computing residuals
   
   if(hetero=="HETERO"){
+    hetv <- as.matrix(hetv)
     uhat2 <- uhat^2
-    est.hetero <- lm(uhat2~exo+endo + iv+hetv) 
+    summary(uhat2)
+    est.hetero <- lm(uhat2~endo+ exo + iv+hetv) 
+    summary(est.hetero)   # OK with STATA   !!!
     xbetahat <- est.hetero$fitted.value
+    summary(xbetahat)
     uhat <- uhat /sqrt(abs(xbetahat))
   }
   print(" Summary of uhat")
   print(" ---------------")
-  print(summary(uhat))
+  print(summary(uhat))   # OK with STATA   !!!
   
   
   ## Step 2: Nonparametric estimation  of the density of f
   
-  # normal-reference rule-of-thumb (Siverman) (always computed to define the object)
-  bw.sil <-npudensbw(~uhat, ckertype="epanechnikov", bwmethod="normal-reference")
-  print(" Summary of bw")
-  print(" ---------------")
-  summary(bw.sil)
-  
-  ### TO REMOVE ONE DAY !!!!!
-  # One may change the bandwidth here to the one found in stata for the homo case !!: .07154983
-  bw.sil$bw <- .07154983
-  bw.sil$x <- .07154983
-  
-    
-  dens.np <- npudens(bws=bw.sil, ckertype="epanechnikov", bandwidth.compute =FALSE )
-  summary(dens.np)
-  
+
+#  normal-reference rule-of-thumb (Siverman) (always computed to define the object)
+# Stata bw for homo = 0.07154983, Hetero = .23179664 
+# bw.sil <- npudensbw(uhat, bws=0.23179664 , ckertype="epanechnikov", bandwidth.compute=FALSE) 
+                    
   if(udensmethod == "CV"){
-    bw.cv <-npudensbw(~uhat, ckertype="epanechnikov", bandwidth.compute =TRUE )
-    dens.np<- npudens(bws=bw.cv, ckertype="epanechnikov",bandwidth.compute = FALSE)
-    summary(dens.np)
+    bw.dens <-npudensbw(~uhat, ckertype="epanechnikov", bandwidth.compute =TRUE )
   }
   if(udensmethod == "FIXED") {
     # fhat with user-defined bandwidth
-    bw.fixed <- bw.sil  # to start with an existing object
-    bw.fixed$bw <- ubw
-    bw.fixed$bandwidth <- ubw
-    dens.np <- npudens(bws=bw.fixed,ckertype="epanechnikov", bandwidth.compute = FALSE)
-    summary(dens.np)
+    bw.dens <- npudensbw(uhat, bws=ubw , ckertype="epanechnikov", bandwidth.compute=FALSE) 
+#     bw.fixed <- bw.sil  # to start with an existing object
+#     bw.fixed$bw <- ubw
+#     bw.fixed$bandwidth <- ubw
+#     dens.np <- npudens(bws=bw.fixed,ckertype="epanechnikov", bandwidth.compute = FALSE)
   }
-  # Computing fhat 
-  print(" ---Computing fhat ---")
-  print(" ---------------")
-  fhat <-predict(dens.np)
+  # Density estimation 
+  dens.np <- npudens(bws=bw.dens,ckertype="epanechnikov", bandwidth.compute = FALSE)
+
+#   Computing fhat 
+#   print(" ---Computing fhat ---")
+#   print(" ---------------")
+  fhat <-dens.np$dens
   
   print(" --- Summary of fhat ---")
   print(" ---------------")
   print(summary(fhat))
-  print(" ")
+  print(sd(fhat))     # Still OK with stata
   
   print(paste("---length of fhat:",length(fhat), "obs"))
   print(paste("--- Nb of fhat = 0 : ",length(which(abs(fhat) < 0.0000001)),"obs"))
@@ -577,7 +570,7 @@ specialreg.fitN <- function(y,v, endo, exo,  iv,
   print("  ")
   
   vpos <- as.numeric(v >= 0)
-  T1 <- ( as.numeric(y) - vpos)/ fhat
+  T1 <- ( as.numeric(y==1) - vpos)/ fhat    # <-- c'est là que ça va pas (même avec la densité stata)!!!!
   
   # Correction if Hetero option
   if(hetero=="HETERO"){
@@ -606,7 +599,6 @@ specialreg.fitN <- function(y,v, endo, exo,  iv,
   
   # spe.ivreg <- ivreg(T1.trim~ endo + exo | iv+exo, subset = T1.trim != "NA")
   
-  
   spe.ivreg <- ivreg(T1.trim ~ endo + exo | iv +exo)
   
   
@@ -617,9 +609,8 @@ specialreg.fitN <- function(y,v, endo, exo,  iv,
   print(paste("Number of points : ",spe.ivreg$nobs,"obs."))
   # print(paste("Sample used in ivreg : ",length(spe.ivreg$residuals), "points."))
   
-  
   return(spe.ivreg)
-  # TODO implement manualy 2SLS to compare the results. 
+  
   
   ## END
 }
