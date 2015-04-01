@@ -10,8 +10,13 @@ library(AER)
 library(Formula)
 library(texreg)
 
+<<<<<<< HEAD
 setwd("D:/progs/Celine/Special")   
 #setwd("c:/Chris/progs/Celine/Special")   
+=======
+#setwd("D:/progs/Celine/Special")   
+setwd("c:/Chris/progs/Celine/Special")   
+>>>>>>> origin/master
 
 ##  Testing wintrim 
 # generating the same numbers than in the real dataset
@@ -60,9 +65,15 @@ data.all<-read.dta("../Water/data/FinalFile.dta")
 # data.all<-read.dta("FinalFileResults1.dta")
 # 
 # # Load data with results (heterogenous) !!
+<<<<<<< HEAD
 # data.all<-read.dta("FinalFileResultsHet.dta")
 
 
+=======
+ data.all<-read.dta("FinalFileResultsHet.dta")
+
+
+>>>>>>> origin/master
 # Loading the chosen Dataset 
 
 nrow(data.all)
@@ -70,12 +81,13 @@ data.work <- as.data.frame(data.all)
 
 attach(data.work)
 # Here we prepare data with standard notations 
-D <- i_tap
-endo <- isatis_health
+D <- cbind(i_tap)
+endo <- cbind(isatis_health)
 iv <- cbind(itap_2008 ,iconcernwatpol_2008)
 exo <- cbind( a2_age,i_under18, log_income, i_town, i_car, b08_locenv_water, i_can, i_fra)
 hetv <- cbind(i_under18, log_income, i_town ,b08_locenv_water)
 
+<<<<<<< HEAD
 
 
 # Variables def pour test pas a pas TO REMOVE !!!
@@ -85,6 +97,15 @@ trimtype <-"TRIM"
 trimlevel <- 0.025
 hetero = "HETERO"
 udensmethod = "SILVERMAN"  
+=======
+#####  Variables def pour test pas a pas TO REMOVE !!!
+# y <- i_tap
+# v <- Special
+# trimtype <-"TRIM"
+# trimlevel <- 0.025
+# hetero = "HETERO"
+# udensmethod = "SILVERMAN"  
+>>>>>>> origin/master
 
 # nouvelle formulation avec exo, endo et iv explicites !!! 
 retour <- specialreg.fitN(D,Special, endo,  exo, iv,  
@@ -98,6 +119,7 @@ retour2 <- specialreg.fitN(D,Special, endo,  exo, iv,
 
 # Stata bw for homo = 0.07154983, Hetero = .23179664 
 
+<<<<<<< HEAD
 retour3 <- specialreg.fitN(D,Special, endo,  exo, iv,  
                            trimtype="TRIM", trimlevel=0.025,
                            hetero = "HETERO", hetv =hetv, 
@@ -128,6 +150,128 @@ retour <- specialreg.mfx(D,Special, endo,  exo, iv,
                              trimtype="TRIM", trimlevel=0.025,
                              hetero = "HETERO", hetv =hetv, 
                              udensmethod = "SILVERMAN" )   
+=======
+retour3 <- specialreg.fitN(D,Special, endo,  exo, iv,  
+                           trimtype="TRIM", trimlevel=0.025,
+                           hetero = "HETERO", hetv =hetv, 
+                           udensmethod = "SILVERMAN")  
+
+
+retour3 <- specialreg.fitN(D,Special, endo,  exo, iv,  
+                           trimtype="WINSOR", trimlevel=0.025,
+                           hetero = "HETERO", hetv =hetv, 
+                           udensmethod = "FIXED", 
+                           ubw = .23179664   )   
+
+
+# Old procedure splittted in two : 
+retour <- specialreg.fitMarg(D,Special, endo,  exo, iv,  
+                           trimtype="TRIM", trimlevel=0.025,
+                           hetero = "HETERO", hetv =hetv, 
+                           udensmethod = "SILVERMAN" )  
+
+# Test on parameters used in paper (table2) 
+
+retour.fit <- specialreg.fit(D,Special, endo,  exo, iv,  
+                             trimtype="TRIM", trimlevel=0.025,
+                             hetero = "HETERO", hetv =hetv, 
+                             udensmethod = "SILVERMAN" )   
+
+
+retour.mfx <- specialreg.mfx(D,Special, endo,  exo, iv,  
+                             trimtype="TRIM", trimlevel=0.025,
+                             hetero = "HETERO", hetv =hetv, 
+                             udensmethod = "SILVERMAN" )   
+
+## Attenpt to recover results from table 4 
+
+
+m1 <-specialreg.fit(D,Special, endo,  exo, iv,  
+                    trimtype="WINSOR", trimlevel=0.005,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+m2 <-specialreg.fit(D,Special, endo,  exo, iv,  
+                    trimtype="TRIM", trimlevel=0.005,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+
+m3 <-specialreg.fit(D,Special, endo,  exo, iv,  
+                    trimtype="WINSOR", trimlevel=0.025,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+m4 <-specialreg.fit(D,Special, endo,  exo, iv,  
+                    trimtype="TRIM", trimlevel=0.025,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+
+m5<-specialreg.fit(D,Special, endo,  exo, iv,  
+                    trimtype="WINSOR", trimlevel=0.05,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+m6 <-specialreg.fit(D,Special, endo,  exo, iv,  
+                    trimtype="TRIM", trimlevel=0.05,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+
+screenreg( l= list(m1, m2, m3, m4, m5, m6), 
+           stars = c(0.01, 0.05, 0.10), 
+           digits = 3)
+
+
+
+# Test avec les résidus estimés de STATA : Cas HETERO
+
+m1.h <-specialreg.fit.stata(D,Special, endo,  exo, iv,  
+                    trimtype="WINSOR", trimlevel=0.005,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+
+m2.h <-specialreg.fit.stata(D,Special, endo,  exo, iv,  
+                    trimtype="TRIM", trimlevel=0.005,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+
+m3.h <-specialreg.fit.stata(D,Special, endo,  exo, iv,  
+                    trimtype="WINSOR", trimlevel=0.025,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+m4.h <-specialreg.fit.stata(D,Special, endo,  exo, iv,  
+                    trimtype="TRIM", trimlevel=0.025,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+
+m5.h<-specialreg.fit.stata(D,Special, endo,  exo, iv,  
+                   trimtype="WINSOR", trimlevel=0.05,
+                   hetero = "HETERO", hetv =hetv, 
+                   udensmethod = "SILVERMAN" )   
+
+m6.h <-specialreg.fit.stata(D,Special, endo,  exo, iv,  
+                    trimtype="TRIM", trimlevel=0.05,
+                    hetero = "HETERO", hetv =hetv, 
+                    udensmethod = "SILVERMAN" )   
+
+screenreg( l= list(m1.h, m2.h, m3.h, m4.h, m5.h, m6.h), 
+           stars = c(0.01, 0.05, 0.10), 
+           digits = 3)
+
+
+
+retour.mfx.stata <- specialreg.mfx.stata(D,Special, endo,  exo, iv,  
+                             trimtype="TRIM", trimlevel=0.025,
+                             hetero = "HETERO", hetv =hetv, 
+                             udensmethod = "SILVERMAN" )   
+
+>>>>>>> origin/master
 
 retour.arg <- specialreg.fitMarg(D,Special, endo,  exo, iv,  
                          trimtype="TRIM", trimlevel=0.025,
