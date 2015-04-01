@@ -3,6 +3,13 @@
 
 rm(list=ls())
 
+
+library(np)
+library(foreign)
+library(AER)
+library(Formula)
+library(texreg)
+
 setwd("D:/progs/Celine/Special")   
 #setwd("c:/Chris/progs/Celine/Special")   
 
@@ -15,15 +22,17 @@ trimtest <- 0.005
 
 # Par defaut toutes lmes fonctions sont à 5%: trim = 0.05
 
-trim1 <- wintrim(x.u, trimtype = "TRIM" , trimlevel = trimtest)   # <- defaut
-trim2 <- wintrim2(x.u , trimtype = "TRIM" , trimlevel = trimtest)   # <- defaut
-trim3 <- wintrim.stata(x.u , trimtype = "TRIM" , trimlevel = trimtest)  # <- defaut
-trim4 <- wintrim.test(x.u , trimtype = "TRIM" , trimlevel = trimtest)  # <- defaut
+trim1 <- wintrim(x.u, trimtype = "WINSOR" , trimlevel = trimtest)   # <- defaut
+trim2 <- wintrim2(x.u , trimtype = "WINSOR" , trimlevel = trimtest)   # <- defaut
+trim3 <- wintrim.stata(x.u , trimtype = "WINSOR" , trimlevel = trimtest)  # <- defaut
+trim4 <- wintrim.test(x.u , trimtype = "WINSOR" , trimlevel = trimtest)  # <- defaut
+trim5 <- wintrim.testN(x.u , trimtype = "WINSOR" , trimlevel = trimtest)  # <- defaut
+
 
 # La borne quantile est presque identiques au max 
 quantile(abs(x.u), probs=1-trimtest)
 
-lapply(list(trim1, trim2,trim3,trim4), summary)
+lapply(list(trim1, trim2,trim3,trim4, trim5), summary)
 
 
 # Les longueurs diffèrent 
@@ -40,20 +49,24 @@ length(which(abs(x.u) < quantile(abs(x.u), probs=1-trimtest)))
 # 0 de différence pour trimlevel = 0.025 et 0.005
 
 
-
+######################-------------------------------############################
+#####################--------------------------------###########################
 #  test des fonctions SpecialReg sur nos données 
 
 ## Load the dat directly after an estimation in STATA to have same sample 2771 obs. 
 data.all<-read.dta("../Water/data/FinalFile.dta")
 
-# Load data with results (homogenous) !!
-data.all<-read.dta("FinalFileResults1.dta")
+# # Load data with results (homogenous) !!
+# data.all<-read.dta("FinalFileResults1.dta")
+# 
+# # Load data with results (heterogenous) !!
+# data.all<-read.dta("FinalFileResultsHet.dta")
 
-# Load data with results (heterogenous) !!
-data.all<-read.dta("FinalFileResultsHet.dta")
+
+# Loading the chosen Dataset 
 
 nrow(data.all)
-data.work <- data.all
+data.work <- as.data.frame(data.all)
 
 attach(data.work)
 # Here we prepare data with standard notations 
@@ -63,11 +76,15 @@ iv <- cbind(itap_2008 ,iconcernwatpol_2008)
 exo <- cbind( a2_age,i_under18, log_income, i_town, i_car, b08_locenv_water, i_can, i_fra)
 hetv <- cbind(i_under18, log_income, i_town ,b08_locenv_water)
 
-## Variables def pour test pas a pas TO REMOVE !!!
-# y <- i_tap
-# v <- Special
-# trimtype <-"TRIM"
-# trimlevel <- 0.025
+
+
+# Variables def pour test pas a pas TO REMOVE !!!
+y <- i_tap
+v <- Special
+trimtype <-"TRIM"
+trimlevel <- 0.025
+hetero = "HETERO"
+udensmethod = "SILVERMAN"  
 
 # nouvelle formulation avec exo, endo et iv explicites !!! 
 retour <- specialreg.fitN(D,Special, endo,  exo, iv,  
@@ -80,11 +97,42 @@ retour2 <- specialreg.fitN(D,Special, endo,  exo, iv,
                           hetero = "HETERO", hetv =hetv )  
 
 # Stata bw for homo = 0.07154983, Hetero = .23179664 
-retour3 <- specialreg.fitN(D,Special, endo,  exo, iv,  
-                           trimtype="TRIM", trimlevel=0.005,
-                           hetero = "HETERO", hetv =hetv, 
-                           udensmethod = "CV")  
 
+retour3 <- specialreg.fitN(D,Special, endo,  exo, iv,  
+                           trimtype="TRIM", trimlevel=0.025,
+                           hetero = "HETERO", hetv =hetv, 
+                           udensmethod = "SILVERMAN")  
+
+
+retour3 <- specialreg.fitN(D,Special, endo,  exo, iv,  
+                           trimtype="WINSOR", trimlevel=0.025,
+                           hetero = "HETERO", hetv =hetv, 
+                           udensmethod = "FIXED", 
+                           ubw = .23179664   )   
+
+# New function with mfx 
+
+retour <- specialreg.fitMarg(D,Special, endo,  exo, iv,  
+                           trimtype="TRIM", trimlevel=0.025,
+                           hetero = "HETERO", hetv =hetv, 
+                           udensmethod = "SILVERMAN" )  
+
+
+retour.fit <- specialreg.fit(D,Special, endo,  exo, iv,  
+                         trimtype="TRIM", trimlevel=0.025,
+                         hetero = "HETERO", hetv =hetv, 
+                         udensmethod = "SILVERMAN" )   
+
+
+retour <- specialreg.mfx(D,Special, endo,  exo, iv,  
+                             trimtype="TRIM", trimlevel=0.025,
+                             hetero = "HETERO", hetv =hetv, 
+                             udensmethod = "SILVERMAN" )   
+
+retour.arg <- specialreg.fitMarg(D,Special, endo,  exo, iv,  
+                         trimtype="TRIM", trimlevel=0.025,
+                         hetero = "HETERO", hetv =hetv, 
+                         udensmethod = "SILVERMAN" )   
 
 ################################## OLD STUFF (Usefull though !) ###############)
 
